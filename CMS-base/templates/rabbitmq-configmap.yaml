@@ -1,0 +1,147 @@
+{{- if .Values.rabbitmq.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rabbitmq-config
+  labels:
+    app: rabbitmq
+    component: message-queue
+    chart: {{ include "chart.name" . }}
+    version: {{ include "chart.version" . }}
+    release: {{ .Release.Name }}
+data:
+  rabbitmq.conf: |
+    # RabbitMQ configuration for microservices test
+    listeners.tcp.default = 5672
+    management.tcp.port = 15672
+    management.tcp.ip = 0.0.0.0
+    
+    # Cluster configuration
+    cluster_formation.peer_discovery_backend = rabbit_peer_discovery_classic_config
+    cluster_formation.classic_config.nodes.1 = rabbit@localhost
+    
+    # Memory and disk limits
+    vm_memory_high_watermark.relative = 0.6
+    disk_free_limit.relative = 1.0
+    
+    # Logging
+    log.console = true
+    log.console.level = info
+    log.file = false
+    
+    # Network configuration
+    tcp_listen_options.backlog = 128
+    tcp_listen_options.nodelay = true
+    tcp_listen_options.keepalive = true
+    tcp_listen_options.exit_on_close = false
+    
+    # Heartbeat configuration
+    heartbeat = 60
+    
+    # Connection limits
+    num_acceptors.tcp = 10
+    handshake_timeout = 10000
+    
+    # Channel limits
+    channel_max = 2047
+    connection_max = 1000
+    
+    # Queue configuration
+    queue_master_locator = min-masters
+    
+    # Message TTL
+    default_user_tags.administrator = true
+    
+    # Security
+    auth_mechanisms.1 = PLAIN
+    auth_mechanisms.2 = AMQPLAIN
+    auth_backends.1 = internal
+    
+    # Management plugin
+    management.http_log_dir = /var/log/rabbitmq/management-access.log
+    
+    # Prometheus metrics
+    prometheus.tcp.port = 15692
+    prometheus.tcp.ip = 0.0.0.0
+    
+    # Performance tuning
+    collect_statistics_interval = 5000
+    hipe_compile = false
+    
+    # SSL configuration (disabled for testing)
+    ssl_options.verify = verify_none
+    ssl_options.fail_if_no_peer_cert = false
+    
+    # Queue configuration
+    queue_index_embed_msgs_below = 4096
+    
+    # Network partition handling
+    cluster_partition_handling = pause_minority
+    
+    # Queue master location
+    queue_master_locator = min-masters
+    
+    # Consumer timeout
+    consumer_timeout = 30000
+    
+    # Memory alarm
+    vm_memory_high_watermark_paging_ratio = 0.5
+    
+    # Disk alarm
+    disk_free_limit.absolute = 1GB
+  definitions.json: |
+    {
+      "rabbit_version": "3.12.0",
+      "rabbitmq_version": "3.12.0",
+      "product_name": "RabbitMQ",
+      "product_version": "3.12.0",
+      "users": [],
+      "vhosts": [
+        {
+          "name": "/"
+        }
+      ],
+      "permissions": [],
+      "topic_permissions": [],
+      "parameters": [],
+      "global_parameters": [
+        {
+          "name": "cluster_name",
+          "value": "rabbit@localhost"
+        }
+      ],
+      "policies": [
+        {
+          "vhost": "/",
+          "name": "ha-policy",
+          "pattern": ".*",
+          "apply-to": "all",
+          "definition": {
+            "ha-mode": "all"
+          },
+          "priority": 0
+        }
+      ],
+      "queues": [
+        {
+          "name": "tasks",
+          "vhost": "/",
+          "durable": true,
+          "auto_delete": false,
+          "arguments": {}
+        }
+      ],
+      "exchanges": [
+        {
+          "name": "",
+          "vhost": "/",
+          "type": "direct",
+          "durable": true,
+          "auto_delete": false,
+          "internal": false,
+          "arguments": {}
+        }
+      ],
+      "bindings": []
+    }
+{{- end }}

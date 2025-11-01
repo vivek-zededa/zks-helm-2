@@ -1,0 +1,149 @@
+{{- if .Values.nodePort.enabled }}
+# Frontend NodePort Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.frontend.name }}-nodeport
+  labels:
+    app: {{ .Values.frontend.name }}
+    component: frontend
+    service-type: nodeport
+    chart: {{ include "chart.name" . }}
+    version: {{ include "chart.version" . }}
+    release: {{ .Release.Name }}
+spec:
+  type: NodePort
+  ports:
+  - port: {{ .Values.frontend.service.port }}
+    targetPort: {{ .Values.frontend.service.targetPort }}
+    nodePort: {{ .Values.nodePort.frontend.port }}
+    protocol: TCP
+    name: http
+  selector:
+    app: {{ .Values.frontend.name }}
+---
+# Backend NodePort Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.backend.name }}-nodeport
+  labels:
+    app: {{ .Values.backend.name }}
+    component: backend
+    service-type: nodeport
+    chart: {{ include "chart.name" . }}
+    version: {{ include "chart.version" . }}
+    release: {{ .Release.Name }}
+spec:
+  type: NodePort
+  ports:
+  - port: {{ .Values.backend.service.port }}
+    targetPort: {{ .Values.backend.service.targetPort }}
+    nodePort: {{ .Values.nodePort.backend.port }}
+    protocol: TCP
+    name: http
+  selector:
+    app: {{ .Values.backend.name }}
+---
+# Monitoring NodePort Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.monitoring.name }}-nodeport
+  labels:
+    app: {{ .Values.monitoring.name }}
+    component: monitoring
+    service-type: nodeport
+    chart: {{ include "chart.name" . }}
+    version: {{ include "chart.version" . }}
+    release: {{ .Release.Name }}
+spec:
+  type: NodePort
+  ports:
+  - port: {{ .Values.monitoring.service.port }}
+    targetPort: {{ .Values.monitoring.service.targetPort }}
+    nodePort: {{ .Values.nodePort.monitoring.port }}
+    protocol: TCP
+    name: http
+  selector:
+    app: {{ .Values.monitoring.name }}
+---
+# PostgreSQL NodePort Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgresql-nodeport
+  labels:
+    app: postgresql
+    component: database
+    service-type: nodeport
+    chart: {{ include "chart.name" . }}
+    version: {{ include "chart.version" . }}
+    release: {{ .Release.Name }}
+spec:
+  type: NodePort
+  ports:
+  - port: 5432
+    targetPort: 5432
+    nodePort: {{ .Values.nodePort.postgresql.port }}
+    protocol: TCP
+    name: postgres
+  selector:
+    app: postgresql
+---
+# Redis NodePort Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-nodeport
+  labels:
+    app: redis
+    component: cache
+    service-type: nodeport
+    chart: {{ include "chart.name" . }}
+    version: {{ include "chart.version" . }}
+    release: {{ .Release.Name }}
+spec:
+  type: NodePort
+  ports:
+  - port: 6379
+    targetPort: 6379
+    nodePort: {{ .Values.nodePort.redis.port }}
+    protocol: TCP
+    name: redis
+  selector:
+    app: redis
+---
+# RabbitMQ NodePort Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: rabbitmq-nodeport
+  labels:
+    app: rabbitmq
+    component: message-queue
+    service-type: nodeport
+    chart: {{ include "chart.name" . }}
+    version: {{ include "chart.version" . }}
+    release: {{ .Release.Name }}
+spec:
+  type: NodePort
+  ports:
+  - port: 5672
+    targetPort: 5672
+    nodePort: {{ .Values.nodePort.rabbitmq.amqpPort }}
+    protocol: TCP
+    name: amqp
+  - port: 15672
+    targetPort: 15672
+    nodePort: {{ .Values.nodePort.rabbitmq.managementPort }}
+    protocol: TCP
+    name: management
+  - port: 15692
+    targetPort: 15692
+    nodePort: {{ .Values.nodePort.rabbitmq.metricsPort }}
+    protocol: TCP
+    name: metrics
+  selector:
+    app: rabbitmq
+{{- end }}

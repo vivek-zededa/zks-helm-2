@@ -1,0 +1,17 @@
+apiVersion: v2
+appVersion: 1.0.0
+description: A comprehensive Helm chart with interdependent microservices, network
+  policies, ingress, and egress for orchestrator testing
+icon: https://raw.githubusercontent.com/kubernetes/kubernetes/master/logo/logo.png
+keywords:
+- microservices
+- testing
+- orchestrator
+- network-policies
+- ingress
+maintainers:
+- email: test@example.com
+  name: Test Team
+name: complex-microservices-stack
+type: application
+version: 0.2.1

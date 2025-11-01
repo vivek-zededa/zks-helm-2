@@ -1,0 +1,162 @@
+{{- if .Values.backend.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.backend.name }}-config
+  labels:
+    app: {{ .Values.backend.name }}
+    component: backend
+    chart: {{ include "chart.name" . }}
+    version: {{ include "chart.version" . }}
+    release: {{ .Release.Name }}
+data:
+  app.js: |
+    const express = require('express');
+    const { Pool } = require('pg');
+    const redis = require('redis');
+    const amqp = require('amqplib');
+    
+    const app = express();
+    const port = process.env.PORT || 3000;
+    
+    // Database connection
+    const pool = new Pool({
+      host: process.env.POSTGRES_HOST,
+      port: process.env.POSTGRES_PORT,
+      database: process.env.POSTGRES_DB,
+      user: process.env.POSTGRES_USER,
+      password: process.env.POSTGRES_PASSWORD,
+    });
+    
+    // Redis connection
+    const redisClient = redis.createClient({
+      socket: {
+        host: process.env.REDIS_HOST || 'redis',
+        port: parseInt(process.env.REDIS_PORT || '6379'),
+      }
+    });
+    
+    // RabbitMQ connection
+    let rabbitConnection;
+    let rabbitChannel;
+    
+    async function connectRabbitMQ() {
+      try {
+        rabbitConnection = await amqp.connect(process.env.RABBITMQ_URL);
+        rabbitChannel = await rabbitConnection.createChannel();
+        await rabbitChannel.assertQueue('tasks', { durable: true });
+      } catch (error) {
+        console.error('RabbitMQ connection failed:', error);
+      }
+    }
+    
+    app.use(express.json());
+    
+    // Health check endpoints
+    app.get('/health', (req, res) => {
+      res.status(200).json({ status: 'healthy', timestamp: new Date().toISOString() });
+    });
+    
+    app.get('/ready', async (req, res) => {
+      try {
+        // Check database connection
+        await pool.query('SELECT 1');
+        // Check Redis connection
+        await redisClient.ping();
+        res.status(200).json({ status: 'ready', timestamp: new Date().toISOString() });
+      } catch (error) {
+        res.status(503).json({ status: 'not ready', error: error.message });
+      }
+    });
+    
+    // API endpoints
+    app.get('/api/users', async (req, res) => {
+      try {
+        const result = await pool.query('SELECT * FROM users ORDER BY id');
+        res.json(result.rows);
+      } catch (error) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+    
+    app.post('/api/users', async (req, res) => {
+      try {
+        const { name, email } = req.body;
+        const result = await pool.query(
+          'INSERT INTO users (name, email) VALUES ($1, $2) RETURNING *',
+          [name, email]
+        );
+        
+        // Cache the result
+        await redisClient.setex(`user:${result.rows[0].id}`, 3600, JSON.stringify(result.rows[0]));
+        
+        // Send to queue for processing
+        if (rabbitChannel) {
+          await rabbitChannel.sendToQueue('tasks', Buffer.from(JSON.stringify({
+            type: 'user_created',
+            data: result.rows[0]
+          })));
+        }
+        
+        res.status(201).json(result.rows[0]);
+      } catch (error) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+    
+    app.get('/api/cache/:key', async (req, res) => {
+      try {
+        const value = await redisClient.get(req.params.key);
+        if (value) {
+          res.json(JSON.parse(value));
+        } else {
+          res.status(404).json({ error: 'Key not found' });
+        }
+      } catch (error) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+    
+    // Initialize connections
+    async function start() {
+      try {
+        await redisClient.connect();
+        await connectRabbitMQ();
+        
+        // Create tables if they don't exist
+        await pool.query(`
+          CREATE TABLE IF NOT EXISTS users (
+            id SERIAL PRIMARY KEY,
+            name VARCHAR(255) NOT NULL,
+            email VARCHAR(255) UNIQUE NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          )
+        `);
+        
+        app.listen(port, () => {
+          console.log(`Backend API server running on port ${port}`);
+        });
+      } catch (error) {
+        console.error('Failed to start server:', error);
+        process.exit(1);
+      }
+    }
+    
+    start();
+  package.json: |
+    {
+      "name": "backend-api",
+      "version": "1.0.0",
+      "description": "Backend API for microservices test",
+      "main": "app.js",
+      "scripts": {
+        "start": "node app.js"
+      },
+      "dependencies": {
+        "express": "^4.18.2",
+        "pg": "^8.11.3",
+        "redis": "^4.6.8",
+        "amqplib": "^0.10.3"
+      }
+    }
+{{- end }}

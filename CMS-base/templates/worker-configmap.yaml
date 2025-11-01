@@ -1,0 +1,168 @@
+{{- if .Values.worker.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.worker.name }}-config
+  labels:
+    app: {{ .Values.worker.name }}
+    component: worker
+    chart: {{ include "chart.name" . }}
+    version: {{ include "chart.version" . }}
+    release: {{ .Release.Name }}
+data:
+  worker.py: |
+    import asyncio
+    import json
+    import logging
+    import os
+    import time
+    from datetime import datetime
+    
+    import aio_pika
+    import redis.asyncio as redis
+    
+    # Configure logging
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
+    
+    class Worker:
+        def __init__(self):
+            self.redis_client = None
+            self.connection = None
+            self.channel = None
+            self.queue = None
+            
+        async def connect_redis(self):
+            """Connect to Redis"""
+            try:
+                redis_host = os.getenv('REDIS_HOST', 'redis')
+                redis_port = int(os.getenv('REDIS_PORT', 6379))
+                redis_url = f"redis://{redis_host}:{redis_port}"
+                self.redis_client = redis.from_url(
+                    redis_url,
+                    decode_responses=True
+                )
+                await self.redis_client.ping()
+                logger.info("Connected to Redis")
+            except Exception as e:
+                logger.error(f"Failed to connect to Redis: {e}")
+                raise
+        
+        async def connect_rabbitmq(self):
+            """Connect to RabbitMQ"""
+            try:
+                rabbitmq_url = os.getenv('RABBITMQ_URL', 'amqp://user:password@rabbitmq:5672')
+                self.connection = await aio_pika.connect_robust(rabbitmq_url)
+                self.channel = await self.connection.channel()
+                await self.channel.set_qos(prefetch_count=1)
+                
+                self.queue = await self.channel.declare_queue('tasks', durable=True)
+                logger.info("Connected to RabbitMQ")
+            except Exception as e:
+                logger.error(f"Failed to connect to RabbitMQ: {e}")
+                raise
+        
+        async def process_message(self, message):
+            """Process a message from the queue"""
+            try:
+                async with message.process():
+                    task_data = json.loads(message.body.decode())
+                    logger.info(f"Processing task: {task_data}")
+                    
+                    # Simulate work based on task type
+                    if task_data.get('type') == 'user_created':
+                        await self.handle_user_created(task_data.get('data', {}))
+                    elif task_data.get('type') == 'data_processing':
+                        await self.handle_data_processing(task_data.get('data', {}))
+                    else:
+                        logger.warning(f"Unknown task type: {task_data.get('type')}")
+                    
+                    # Update Redis with processing status
+                    await self.redis_client.setex(
+                        f"task:{task_data.get('id', 'unknown')}:status",
+                        3600,
+                        "completed"
+                    )
+                    
+                    logger.info(f"Task completed: {task_data}")
+                    
+            except Exception as e:
+                logger.error(f"Error processing message: {e}")
+                # In a real scenario, you might want to retry or send to dead letter queue
+        
+        async def handle_user_created(self, user_data):
+            """Handle user creation task"""
+            logger.info(f"Processing user creation for: {user_data.get('name')}")
+            
+            # Simulate some processing time
+            await asyncio.sleep(1)
+            
+            # Store processing result in Redis
+            await self.redis_client.setex(
+                f"user:{user_data.get('id')}:processed",
+                3600,
+                json.dumps({
+                    'processed_at': datetime.utcnow().isoformat(),
+                    'status': 'completed',
+                    'user_id': user_data.get('id')
+                })
+            )
+        
+        async def handle_data_processing(self, data):
+            """Handle data processing task"""
+            logger.info(f"Processing data: {data}")
+            
+            # Simulate data processing
+            await asyncio.sleep(2)
+            
+            # Store result
+            await self.redis_client.setex(
+                f"data:{data.get('id', 'unknown')}:result",
+                3600,
+                json.dumps({
+                    'processed_at': datetime.utcnow().isoformat(),
+                    'result': 'success',
+                    'data_id': data.get('id')
+                })
+            )
+        
+        async def start_consuming(self):
+            """Start consuming messages from the queue"""
+            try:
+                await self.queue.consume(self.process_message)
+                logger.info("Started consuming messages")
+                
+                # Keep the worker running
+                while True:
+                    await asyncio.sleep(1)
+                    
+            except Exception as e:
+                logger.error(f"Error in message consumption: {e}")
+                raise
+        
+        async def start(self):
+            """Start the worker"""
+            try:
+                await self.connect_redis()
+                await self.connect_rabbitmq()
+                await self.start_consuming()
+            except Exception as e:
+                logger.error(f"Worker failed to start: {e}")
+                raise
+            finally:
+                if self.connection:
+                    await self.connection.close()
+                if self.redis_client:
+                    await self.redis_client.close()
+    
+    async def main():
+        worker = Worker()
+        await worker.start()
+    
+    if __name__ == "__main__":
+        asyncio.run(main())
+  
+  requirements.txt: |
+    aio-pika==9.2.2
+    redis==4.6.0
+{{- end }}

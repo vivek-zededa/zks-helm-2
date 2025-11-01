@@ -1,0 +1,63 @@
+{{- if .Values.configMaps }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.app.name }}-config
+  labels:
+    app: {{ .Values.app.name }}
+    chart: {{ include "chart.name" . }}
+    version: {{ include "chart.version" . }}
+    release: {{ .Release.Name }}
+data:
+  {{- range $key, $value := .Values.configMaps.appConfig.data }}
+  {{ $key }}: {{ $value | quote }}
+  {{- end }}
+---
+# Application-wide configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.app.name }}-app-config
+  labels:
+    app: {{ .Values.app.name }}
+    chart: {{ include "chart.name" . }}
+    version: {{ include "chart.version" . }}
+    release: {{ .Release.Name }}
+data:
+  app.properties: |
+    # Application Configuration
+    app.name={{ .Values.app.name }}
+    app.environment={{ .Values.app.environment }}
+    app.namespace={{ .Values.app.namespace }}
+    
+    # Database Configuration
+    database.host=postgresql
+    database.port=5432
+    database.name=appdb
+    database.user=postgres
+    
+    # Cache Configuration
+    cache.host=redis
+    cache.port=6379
+    cache.timeout=30s
+    
+    # Message Queue Configuration
+    queue.host=rabbitmq
+    queue.port=5672
+    queue.user=user
+    queue.vhost=/
+    
+    # Monitoring Configuration
+    monitoring.enabled={{ .Values.monitoring.enabled }}
+    monitoring.host={{ .Values.monitoring.name }}
+    monitoring.port={{ .Values.monitoring.service.port }}
+    
+    # Network Configuration
+    network.policies.enabled={{ .Values.networkPolicies.enabled }}
+    network.ingress.enabled={{ .Values.ingress.enabled }}
+    
+    # Logging Configuration
+    logging.level={{ .Values.configMaps.appConfig.data.LOG_LEVEL }}
+    logging.max_connections={{ .Values.configMaps.appConfig.data.MAX_CONNECTIONS }}
+    logging.timeout={{ .Values.configMaps.appConfig.data.TIMEOUT }}
+{{- end }}
