@@ -1,0 +1,21 @@
+{{- if .Values.monitoring.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.monitoring.name }}
+  labels:
+    app: {{ .Values.monitoring.name }}
+    component: monitoring
+    chart: {{ include "chart.name" . }}
+    version: {{ include "chart.version" . }}
+    release: {{ .Release.Name }}
+spec:
+  type: {{ .Values.monitoring.service.type }}
+  ports:
+  - port: {{ .Values.monitoring.service.port }}
+    targetPort: {{ .Values.monitoring.service.targetPort }}
+    protocol: TCP
+    name: http
+  selector:
+    app: {{ .Values.monitoring.name }}
+{{- end }}

@@ -1,0 +1,6 @@
+apiVersion: v2
+name: massive-pod-deployment
+description: A Helm chart that deploys a scalable app with a common PVC and 50 pods.
+type: application
+version: 0.1.0
+appVersion: "1.0"

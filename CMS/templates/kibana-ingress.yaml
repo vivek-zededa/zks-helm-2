@@ -1,0 +1,28 @@
+{{- if .Values.elasticstack.kibana.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ .Release.Name }}-kibana-ingress
+  labels:
+    app: {{ .Release.Name }}-kibana
+  annotations:
+    {{- if .Values.elasticstack.kibana.ingress.className }}
+    kubernetes.io/ingress.class: "{{ .Values.elasticstack.kibana.ingress.className }}"
+    {{- end }}
+spec:
+  rules:
+    {{- range .Values.elasticstack.kibana.ingress.hosts }}
+    - host: {{ .host }}
+      http:
+        paths:
+          {{- range .paths }}
+          - path: {{ .path }}
+            pathType: {{ .pathType }}
+            backend:
+              service:
+                name: {{ $.Release.Name }}-{{ $.Values.elasticstack.kibana.serviceName }}
+                port:
+                  number: {{ $.Values.elasticstack.kibana.servicePort }}
+          {{- end }}
+    {{- end }}
+{{- end }}

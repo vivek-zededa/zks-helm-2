@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-{{ .Values.elasticstack.kibana.serviceName }}
+  labels:
+    app: {{ .Release.Name }}-kibana
+spec:
+  ports:
+    - port: {{ .Values.elasticstack.kibana.servicePort }}
+      targetPort: {{ .Values.elasticstack.kibana.servicePort }}
+      protocol: TCP
+      name: http
+  selector:
+    app: {{ .Release.Name }}-kibana

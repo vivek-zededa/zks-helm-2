@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-{{ .Values.elasticstack.elasticsearch.serviceName }}
+  labels:
+    app: {{ .Release.Name }}-elasticsearch
+spec:
+  ports:
+    - port: 9200
+      name: http
+    - port: 9300
+      name: transport
+  selector:
+    app: {{ .Release.Name }}-elasticsearch

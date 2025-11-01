@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-{{ .Values.elasticstack.kibana.serviceName }}
+  labels:
+    app: {{ .Release.Name }}-kibana
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-kibana
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-kibana
+    spec:
+      containers:
+        - name: kibana
+          image: "{{ .Values.elasticstack.kibana.image }}"
+          env:
+            - name: ELASTICSEARCH_HOSTS
+              value: "http://{{ .Release.Name }}-{{ .Values.elasticstack.elasticsearch.serviceName }}:9200"
+          ports:
+            - containerPort: {{ .Values.elasticstack.kibana.servicePort }}
+          resources:
+{{ toYaml .Values.elasticstack.kibana.resources | indent 12 }}
